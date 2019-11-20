@@ -29,10 +29,11 @@ def import_files(folder):
     Fs = []
     data = []
     filename = []
+    #Creating a vector of arrays with waves for every number
     for i in range(10):
         Fs.append([])
         data.append([])
-        filename.appned([])
+        filename.append([])
         for file in os.listdir(folder):
             if file[5:8] == '_%d_' % i:
                 rate, wavefile = read(folder + '/' + file)
@@ -41,43 +42,72 @@ def import_files(folder):
                 filename[i].append(file)
     return Fs, data, filename
 
-def compute_mfcc(Fs, data, frame_length):
+def compute_mfcc(Fs, data, frame_length, mfcc_first, mfcc_last):
     mfcc_matrix = []
+    #creating a vector of vectors of MFCC arrays [digit][speaker_number][c column][element]
     for i in range(10):
         number_data = []
         for j in range(len(data[i][:])):
             mfcc_data = sp.base.mfcc(data[i][j], samplerate=Fs[i][j], winlen=frame_length, lowfreq=50, highfreq=8000, winstep=0.01, appendEnergy=True, nfft=882)
-            number_data.append((number_data, mfcc_data[:, 0]))
+            #number_data.append((number_data, mfcc_data[:, 0]))  Przydałaby się możliwość modyfikowania ilości c z MFCC
+            number_data.append((number_data, mfcc_data[:, mfcc_first:mfcc_last]))
         mfcc_matrix.append(number_data)
-    return mfcc_matrix
 
-def split_data(mfcc_matrix):
-    mfcc_matrix_train = []
+    return mfcc_matrix #mfcc_matrix[digit][speaker_number][c column][element]
+
+def split_data(mfcc_matrix, number_splits):
+    mfcc_matrix_train = [] # mfcc_matrix_train [digit][number_of_sets][number_of_mfcc][vector_of_mcc][element]
     mfcc_matrix_test = []
     for i in range(10):
-        folds = sklearn.model_selection.KFold(n_splits=5)
+        folds = sklearn.model_selection.KFold(n_splits=number_splits)
         folds.get_n_splits(mfcc_matrix[i])
         data_matrix_train = []
         data_matrix_test = []
         for train_index, test_index in folds.split(mfcc_matrix[i]):
             pass
-        for j in train_index:
-            data_matrix_train.append(mfcc_matrix[i][j]) #tu trzeba to ogarnąć, po chyba trochę olewam temat
-        for j in test_index:
-            data_matrix_test.append(mfcc_matrix[i][j])
+            data_vector_train = []
+            data_vector_test = []
+
+            for j in train_index: #creating vector of mfcc arrays
+                data_vector_train.append(mfcc_matrix[i][j])
+            for j in test_index: #creating vector of mfcc arrays
+                data_vector_test.append(mfcc_matrix[i][j])
+            data_matrix_train.append(data_vector_train) #adding vector of mfcc to training matrix
+            data_matrix_test.append(data_vector_test) #adding vector of mfcc to testing matrix
+
         mfcc_matrix_train.append(data_matrix_train)
         mfcc_matrix_test.append(data_matrix_test)
     return mfcc_matrix_train, mfcc_matrix_test
 
-def prepare_train_data(mfcc_matrix_train):
-    mfcc_matrix_train = []
+def concatenate_data(mfcc_matrix_set):
+    mfcc_concatenated_matrix = []
     for i in range(10):
-        mfcc_concatenate = []
-        for j in range(len(mfcc_matrix_train[i])):
-            mfcc_concatenate = np.concatenate(mfcc_concatenate, mfcc_matrix_train[i][j])
-    return mfcc_matrix_train
+        mfcc_concatenate = np.empty(2)
+        for j in range(len(mfcc_matrix_set[i])): #iterating through number of sets joining mfcc vectors
+            for k in range(len(mfcc_matrix_set[i][j])):#iterationg through number of mfcc
+                mfcc_concatenate = np.concatenate(mfcc_concatenate, mfcc_matrix_set[i][j][k])
+        print(mfcc_concatenate)
+        mfcc_concatenated_matrix.append(mfcc_concatenate)
+    return mfcc_concatenated_matrix #[digit][number of set][c column][element]
+
+def create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test_concatenated, n_components):
+    gmm_train_vector = []
+    gmm_test_vector = []
+    for i in range(10):
+        gmm_training_results = []
+        gmm_testing_results = []
+        for j in range(len(mfcc_matrix_train_concatenated[i])):#iteration through number of sets
+            gmm_temporary = sklearn.mixture.gaussian_mixture(n_components = n_components, max_iter=100, random_state=4)  # creating temporary gmm
+            gmm_training_results.append(gmm_temporary.sklearn.mixture.gaussian_mixture.fit(mfcc_matrix_train_concatenated[i][j]))#training temporary gmm
+            gmm_testing_results.append(gmm_temporary.sklearn.mixture.gaussian_mixture.score(mfcc_matrix_test_concatenated[i][j]))#testing temporary gmm
+        gmm_train_vector.append(gmm_training_results)#writing training results
+        gmm_test_vector.append(gmm_testing_results)#writing testing results
+    return gmm_train_vector, gmm_test_vector #[digit][number of sets][results]
 
 frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type, permutations = setup()
 Fs, data, filename = import_files('train')
-mfcc_matrix = compute_mfcc(Fs, data, frame_length)
-mfcc_matrix_train, mfcc_matrix_test = split_data(mfcc_matrix)
+mfcc_matrix = compute_mfcc(Fs, data, frame_length, 0, 1)
+mfcc_matrix_train, mfcc_matrix_test = split_data(mfcc_matrix, 5)
+mfcc_matrix_train_concatenated = concatenate_data(mfcc_matrix_train)
+mfcc_matrix_test_concatenated = concatenate_data(mfcc_matrix_test)
+gmm_train_vector, gmm_test_vector = create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test_concatenated, 100)
