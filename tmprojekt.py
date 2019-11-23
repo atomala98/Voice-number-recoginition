@@ -25,35 +25,26 @@ def setup():
     permutations = int(permutations[36:len(permutations):])
     return frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type, permutations
 
-def import_files(folder):
+def compute_mfcc(folder):
     Fs = []
-    data = []
+    mfcc = []
     filename = []
-    #Creating a vector of arrays with waves for every number
+    #creating a vector of vectors of MFCC arrays [digit][speaker_number][c column][element]
     for i in range(10):
         Fs.append([])
-        data.append([])
+        mfcc.append([])
         filename.append([])
         for file in os.listdir(folder):
             if file[5:8] == '_%d_' % i:
-                rate, wavefile = read(folder + '/' + file)
+                rate, data = read(folder + '/' + file)
                 Fs[i].append(rate)
-                data[i].append(wavefile)
+                mfcc_data = sp.base.mfcc(data, samplerate=rate, winlen=frame_length, lowfreq=50,
+                                         highfreq=8000, winstep=0.01, appendEnergy=True, nfft=882)
+                mfcc[i].append(mfcc_data)
                 filename[i].append(file)
-    return Fs, data, filename
-
-def compute_mfcc(Fs, data, frame_length, mfcc_first, mfcc_last):
-    mfcc_matrix = []
+    return Fs, mfcc, filename
     #creating a vector of vectors of MFCC arrays [digit][speaker_number][c column][element]
-    for i in range(10):
-        number_data = []
-        for j in range(len(data[i][:])):
-            mfcc_data = sp.base.mfcc(data[i][j], samplerate=Fs[i][j], winlen=frame_length, lowfreq=50, highfreq=8000, winstep=0.01, appendEnergy=True, nfft=882)
-            #number_data.append((number_data, mfcc_data[:, 0]))  Przydałaby się możliwość modyfikowania ilości c z MFCC
-            number_data.append((number_data, mfcc_data[:, mfcc_first:mfcc_last]))
-        mfcc_matrix.append(number_data)
-
-    return mfcc_matrix #mfcc_matrix[digit][speaker_number][c column][element]
+    #filename [digit][speaker_name]
 
 def split_data(mfcc_matrix, number_splits):
     mfcc_matrix_train = [] # mfcc_matrix_train [digit][number_of_sets][number_of_mfcc][vector_of_mcc][element]
@@ -64,25 +55,22 @@ def split_data(mfcc_matrix, number_splits):
         data_matrix_train = []
         data_matrix_test = []
         for train_index, test_index in folds.split(mfcc_matrix[i]):
-            pass
             data_vector_train = []
             data_vector_test = []
-
             for j in train_index: #creating vector of mfcc arrays
                 data_vector_train.append(mfcc_matrix[i][j])
             for j in test_index: #creating vector of mfcc arrays
                 data_vector_test.append(mfcc_matrix[i][j])
             data_matrix_train.append(data_vector_train) #adding vector of mfcc to training matrix
             data_matrix_test.append(data_vector_test) #adding vector of mfcc to testing matrix
-
-        mfcc_matrix_train.append(data_matrix_train)
+        mfcc_matrix_train.append(data_matrix_train) #creating train array for each numer
         mfcc_matrix_test.append(data_matrix_test)
-    return mfcc_matrix_train, mfcc_matrix_test
+    return mfcc_matrix_train, mfcc_matrix_test #returning vector of train, and test data[digit][number of set][number of mfcc][vector_of_mfcc][element]
 
 def concatenate_data(mfcc_matrix_set):
     mfcc_concatenated_matrix = []
     for i in range(10):
-        mfcc_concatenate = np.empty(2)
+        mfcc_concatenate = []
         for j in range(len(mfcc_matrix_set[i])): #iterating through number of sets joining mfcc vectors
             for k in range(len(mfcc_matrix_set[i][j])):#iterationg through number of mfcc
                 mfcc_concatenate = np.concatenate(mfcc_concatenate, mfcc_matrix_set[i][j][k])
@@ -105,8 +93,7 @@ def create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test_conc
     return gmm_train_vector, gmm_test_vector #[digit][number of sets][results]
 
 frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type, permutations = setup()
-Fs, data, filename = import_files('train')
-mfcc_matrix = compute_mfcc(Fs, data, frame_length, 0, 1)
+Fs, mfcc_matrix, filename = compute_mfcc('train')
 mfcc_matrix_train, mfcc_matrix_test = split_data(mfcc_matrix, 5)
 mfcc_matrix_train_concatenated = concatenate_data(mfcc_matrix_train)
 mfcc_matrix_test_concatenated = concatenate_data(mfcc_matrix_test)
