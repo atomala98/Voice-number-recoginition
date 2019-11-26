@@ -4,6 +4,8 @@ import numpy as np
 import python_speech_features as sp
 import matplotlib.pyplot as plt
 import sklearn.model_selection
+import sklearn.mixture as mix
+import math
 
 def setup():
     file = open('setup.txt', 'r')
@@ -25,7 +27,7 @@ def setup():
     permutations = int(permutations[36:len(permutations):])
     return frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type, permutations
 
-def compute_mfcc(folder):
+def compute_mfcc(folder, mel_filters):
     Fs = []
     mfcc = []
     filename = []
@@ -38,8 +40,8 @@ def compute_mfcc(folder):
             if file[5:8] == '_%d_' % i:
                 rate, data = read(folder + '/' + file)
                 Fs[i].append(rate)
-                mfcc_data = sp.base.mfcc(data, samplerate=rate, winlen=frame_length, lowfreq=50,
-                                         highfreq=8000, winstep=0.01, appendEnergy=True, nfft=882)
+                mfcc_data = sp.base.mfcc(data, samplerate=rate, winlen=frame_length, lowfreq=50, nfilt=mel_filters,
+                                         ceplifter = 0, highfreq=8000, winstep=0.01, appendEnergy=True, nfft=1024)
                 mfcc[i].append(mfcc_data)
                 filename[i].append(file)
     return Fs, mfcc, filename
@@ -70,31 +72,66 @@ def split_data(mfcc_matrix, number_splits):
 def concatenate_data(mfcc_matrix_set):
     mfcc_concatenated_matrix = []
     for i in range(10):
-        mfcc_concatenate = []
+        mfcc_concatenated_sets = []
         for j in range(len(mfcc_matrix_set[i])): #iterating through number of sets joining mfcc vectors
+            #mfcc_concatenate = []
             for k in range(len(mfcc_matrix_set[i][j])):#iterationg through number of mfcc
-                mfcc_concatenate = np.concatenate(mfcc_concatenate, mfcc_matrix_set[i][j][k])
-        print(mfcc_concatenate)
-        mfcc_concatenated_matrix.append(mfcc_concatenate)
+                #np.array(mfcc_matrix_set[i][j])
+                #a = np.array(a)
+                if k == 0:
+                    mfcc_concatenate = mfcc_matrix_set[i][j][k]
+                else:
+                    mfcc_concatenate = np.concatenate((mfcc_concatenate, mfcc_matrix_set[i][j][k]), axis = 0)#sklejenie tylko jaki axis ?
+            mfcc_concatenated_sets.append(mfcc_concatenate)
+        mfcc_concatenated_matrix.append(mfcc_concatenated_sets)
     return mfcc_concatenated_matrix #[digit][number of set][c column][element]
 
-def create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test_concatenated, n_components):
-    gmm_train_vector = []
-    gmm_test_vector = []
+def create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test, n_components, covariance_type):
     for i in range(10):
-        gmm_training_results = []
-        gmm_testing_results = []
         for j in range(len(mfcc_matrix_train_concatenated[i])):#iteration through number of sets
-            gmm_temporary = sklearn.mixture.gaussian_mixture(n_components = n_components, max_iter=100, random_state=4)  # creating temporary gmm
-            gmm_training_results.append(gmm_temporary.sklearn.mixture.gaussian_mixture.fit(mfcc_matrix_train_concatenated[i][j]))#training temporary gmm
-            gmm_testing_results.append(gmm_temporary.sklearn.mixture.gaussian_mixture.score(mfcc_matrix_test_concatenated[i][j]))#testing temporary gmm
-        gmm_train_vector.append(gmm_training_results)#writing training results
-        gmm_test_vector.append(gmm_testing_results)#writing testing results
-    return gmm_train_vector, gmm_test_vector #[digit][number of sets][results]
+            gmm_temporary = mix.GaussianMixture(n_components = n_components, max_iter=100, random_state=4, covariance_type=covariance_type)
+            gmm_temporary.fit(mfcc_matrix_train_concatenated[i][j])
+            likelihood_array = []
+            for k in range(len(mfcc_matrix_test[i][j])):
+                likelihood = math.exp((gmm_temporary.score(mfcc_matrix_test[i][j][k])/len(mfcc_matrix_test[i][j][k])))
+                likelihood_array.append(likelihood)
+            average_likelihood = np.mean(likelihood_array)*100
+            stdev_likelihood = np.std(likelihood_array)*100
+            print("Dla liczby %d, próby %d podobieństwo wynosi: %f +/- %f" % (i, j, average_likelihood, stdev_likelihood))
+
+def concatenate_original_data(mfcc_matrix):
+    mfcc_concatenated_matrix = []
+    for i in range(10):
+        mfcc_concatenated = []
+        for j in range(len(mfcc_matrix[i])):  # iterating through number of sets joining mfcc vectors
+            if j == 0:
+                mfcc_concatenated = mfcc_matrix[i][j]
+            else:
+                mfcc_concatenated = np.concatenate((mfcc_concatenated, mfcc_matrix[i][j]), axis=0)  # sklejenie tylko jaki axis ?
+        mfcc_concatenated_matrix.append(mfcc_concatenated)
+    return mfcc_concatenated_matrix  # [digit][c column][element]
+
+def create_model(mfcc_matrix_concatenated, mfcc_matrix_test, n_components, covariance_type):
+    gmm_numbers = []
+    for i in range(10):
+        gmm = mix.GaussianMixture(n_components = n_components, max_iter=100, random_state=4, covariance_type=covariance_type)
+        gmm.fit(mfcc_matrix_concatenated[i])
+        gmm_numbers.append(gmm)
+    return gmm_numbers
+
+def evaluation(folder, gmm):
+    for file in os.listdir(folder):
+        rate, data = read(folder + '/' + file)
+        mfcc_data = sp.base.mfcc(data, samplerate=rate, winlen=frame_length, lowfreq=50, nfilt=mel_filters,
+                                 ceplifter=0, highfreq=8000, winstep=0.01, appendEnergy=True, nfft=1024)
+        for i in range(10):
+            print(gmm[i].score(mfcc_data))
 
 frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type, permutations = setup()
-Fs, mfcc_matrix, filename = compute_mfcc('train')
+Fs, mfcc_matrix, filename = compute_mfcc('train', mel_filters)
 mfcc_matrix_train, mfcc_matrix_test = split_data(mfcc_matrix, 5)
 mfcc_matrix_train_concatenated = concatenate_data(mfcc_matrix_train)
-mfcc_matrix_test_concatenated = concatenate_data(mfcc_matrix_test)
-gmm_train_vector, gmm_test_vector = create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test_concatenated, 100)
+#create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test, GMM_components, covariance_type)
+mfcc_matrix_concatenated = concatenate_original_data(mfcc_matrix)
+gmm_numbers = create_model(mfcc_matrix_concatenated, mfcc_matrix_test, GMM_components, covariance_type)
+evaluation('test', gmm_numbers)
