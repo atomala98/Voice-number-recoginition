@@ -1,7 +1,7 @@
-Dlugosc ramki [s]: 0.02
-Liczba filtrow melowych: 10
+Dlugosc ramki [s]: 0.05
+Liczba filtrow melowych: 26
 Rzad predyktora: 1
 Liczba wspó³czynnikow cepstralnych: 13
-Liczba komponentow GMM: 1
+Liczba komponentow GMM: 16
 Typ macierzy kowariancji: diag
 Liczba permutacji testu krzyzowego: 1
