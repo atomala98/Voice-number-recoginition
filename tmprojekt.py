@@ -46,37 +46,13 @@ def compute_mfcc(folder, mel_filters):
                                          ceplifter = 0, highfreq=8000, winstep=0.01, appendEnergy=True, nfft=1024)
                 mfcc[i].append(np.transpose(mfcc_data)) #transponowałem żeby się zgadzało z [digit][speaker_number][c column][element]
                 filename[i].append(file)
-    """print("Uwaga")
-    print("Długość 1 dminesion")
-    print(len(mfcc))
-    print("Długość 2 dminesion")
-    print(len(mfcc[0]))
-    print("Długość 2 dminesion")
-    print(len(mfcc[0][0]))
-    print("Długość 3 dminesion")
-    print(len(mfcc[0][0][0]))"""
-
     return Fs, mfcc, filename
     #creating a vector of vectors of MFCC arrays
     #filename [digit][speaker_name]
 
 def split_data(mfcc_matrix, number_splits): #mfcc_matrix [digit][speaker_number][c column][element]
-
-    """print("przed SPLIT")
-    print("Długość 1 dminesion")
-    print(len(mfcc_matrix))
-    print("Długość 2 dminesion")
-    print(len(mfcc_matrix[0]))
-    print("Długość 3 dminesion")
-    print(len(mfcc_matrix[0][0]))
-    print("Długość 4 dminesion")
-    print(len(mfcc_matrix[0][0][0]))"""
-
-
     mfcc_matrix_train = []  # mfcc_matrix_train [digit][number_of_sets][number_of_mfcc][vector_of_mcc][element]
     mfcc_matrix_test = []
-
-    #To dodałem żeby dzielić mówcami
     folds = sklearn.model_selection.KFold(n_splits=number_splits)
     range_of_iteration = 0
     vector_of_training_sets = []
@@ -101,36 +77,10 @@ def split_data(mfcc_matrix, number_splits): #mfcc_matrix [digit][speaker_number]
             data_matrix_test.append(data_vector_test)
         mfcc_matrix_train.append(data_matrix_train)  # creating train array for each numer
         mfcc_matrix_test.append(data_matrix_test)
-
-    """ print("po SPLIT")
-    print("Długość 1 dminesion")
-    print(len(mfcc_matrix_train))
-    print("Długość 2 dminesion")
-    print(len(mfcc_matrix_train[0]))
-    print("Długość 3 dminesion")
-    print(len(mfcc_matrix_train[0][0]))
-    print("Długość 4 dminesion")
-    print(len(mfcc_matrix_train[0][0][0]))"""
-
     return mfcc_matrix_train, mfcc_matrix_test  # returning vector of train, and test data[digit][number of set][number of speaker][vector_of_mfcc][element]
 
 
 def concatenate_data(mfcc_matrix_set):
-    """print("CONCATENATE")
-    print("Długość 1 dminesion")
-    print(len(mfcc_matrix_set))
-    print("Długość 2 dminesion")
-    print(len(mfcc_matrix_set[0]))
-    print("Długość 3 dminesion")
-    print(len(mfcc_matrix_set[0][0]))
-    print("Długość 4 dminesion")
-    print(len(mfcc_matrix_set[0][0][0]))
-    print("Długość 5 dminesion")
-    print(len(mfcc_matrix_set[0][0][0][0]))"""
-
-
-
-
     mfcc_concatenated_matrix = []
     for i in range(10):
         mfcc_concatenated_sets = []
@@ -142,35 +92,12 @@ def concatenate_data(mfcc_matrix_set):
                     mfcc_concatenate = np.asarray(mfcc_matrix_set[i][j][k])
                 else:
                     mfcc_concatenate = np.concatenate((mfcc_concatenate, np.asarray(mfcc_matrix_set[i][j][k])),1) #sklejenie tylko jaki axis ?
-
-
             mfcc_concatenated_sets.append(mfcc_concatenate)
         mfcc_concatenated_matrix.append(mfcc_concatenated_sets)
-
-        """print("After CONCATENATE")
-        print("Długość 1 dminesion")
-        print(len(mfcc_concatenated_matrix))
-        print("Długość 2 dminesion")
-        print(len(mfcc_concatenated_matrix[0]))
-        print("Długość 3 dminesion")
-        print(len(mfcc_concatenated_matrix[0][0]))
-        print("Długość 4 dminesion")
-        print(len(mfcc_concatenated_matrix[0][0][0]))"""
-
     return mfcc_concatenated_matrix #[digit][number of set][c column][element]
 
 
 def create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test, n_components, covariance_type):
-    """
-    print("Długość testów")
-    print("Długość 1 dminesion")
-    print(len(mfcc_matrix_test)) #[digit][number of set][number of speaker][vector_of_mfcc][element]
-    print("Długość 2 dminesion")
-    print(len(mfcc_matrix_test[0]))
-    print("Długość 3 dminesion")
-    print(len(mfcc_matrix_test[0][0]))
-    print("Długość 4 dminesion")
-    print(len(mfcc_matrix_test[0][0][0]))"""
     GMM_models = []  # [digit][number of set (model)]
     for i in range(10):  # creating a vector of trained gmm models
         gmm_models = []
@@ -200,13 +127,6 @@ def create_train_GMMmodels(mfcc_matrix_train_concatenated, mfcc_matrix_test, n_c
 
         general_statistics_final.append(sum(number_statistics) / likelihood_iter)
     print(general_statistics_final)
-
-    #print(gmm_temporary.score(mfcc_matrix_test[i][j][k])/len(mfcc_matrix_test[i][j][k]))
-                #likelihood = math.exp((gmm_temporary.score(mfcc_matrix_test[i][j][k])/len(mfcc_matrix_test[i][j][k])))
-                #likelihood_array.append(likelihood)
-            #average_likelihood = np.mean(likelihood_array)*100
-            #stdev_likelihood = np.std(likelihood_array)*100
-            #print("Dla liczby %d, próby %d podobieństwo wynosi: %f +/- %f" % (i, j, average_likelihood, stdev_likelihood))
 
 def concatenate_original_data(mfcc_matrix):
     mfcc_concatenated_matrix = []
