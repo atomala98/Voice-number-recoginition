@@ -8,26 +8,19 @@ import sklearn.mixture as mix
 import math
 import csv
 import eval
+import json
+
 
 def setup():
-    file = open('setup.txt', 'r')
-    file_lenght = len(file.readlines())
-    file.seek(0)
-    frame_length = file.readline()
-    frame_length = float(frame_length[18:len(frame_length) - 1:])
-    mel_filters = file.readline()
-    mel_filters = int(mel_filters[24:len(mel_filters) - 1:])
-    predictor_order = file.readline()
-    predictor_order = int(predictor_order[16:len(predictor_order) - 1:])
-    cepstral_coefficient = file.readline()
-    cepstral_coefficient = int(cepstral_coefficient[36:len(cepstral_coefficient) - 1:])
-    GMM_components = file.readline()
-    GMM_components = int(GMM_components[24:len(GMM_components) - 1:])
-    covariance_type = file.readline()
-    covariance_type = covariance_type[26:len(covariance_type) - 1:]
-    permutations = file.readline()
-    permutations = int(permutations[36:len(permutations):])
-    return frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type, permutations
+    with open('setup.json') as f:
+        data = json.load(f)
+    frame_length = data['Frame length']
+    mel_filters = data['Mel filters amount']
+    predictor_order = data['Predictor order']
+    cepstral_coefficient = data['Cepstral coefficients amount']
+    GMM_components = data['GMM components amount']
+    covariance_type = data['Covariance matrix type']
+    return frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type
 
 def compute_mfcc(folder, mel_filters):
     Fs = []
@@ -39,12 +32,12 @@ def compute_mfcc(folder, mel_filters):
         mfcc.append([])
         filename.append([])
         for file in os.listdir(folder):
-            if file[5:8] == '_%d_' % i:
+            if file[5:8] == '_{}_'.format(i):
                 rate, data = read(folder + '/' + file)
                 Fs[i].append(rate)
-                mfcc_data = sp.base.mfcc(data, samplerate=rate, winlen=frame_length, lowfreq=50, nfilt=mel_filters,
-                                         ceplifter = 0, highfreq=8000, winstep=0.01, appendEnergy=True, nfft=1024)
-                mfcc[i].append(np.transpose(mfcc_data)) #transponowałem żeby się zgadzało z [digit][speaker_number][c column][element]
+                mfcc_data = sp.base.mfcc(data, samplerate=rate, winlen=frame_length, lowfreq=50, nfilt=mel_filters, ceplifter = 0, highfreq=8000, winstep=0.01, appendEnergy=True, nfft=1024)
+                #calculating MFCC of audio file
+                mfcc[i].append(np.transpose(mfcc_data)) #transposing mfcc data
                 filename[i].append(file)
     return Fs, mfcc, filename
     #creating a vector of vectors of MFCC arrays
@@ -163,7 +156,7 @@ def evaluation(folder, gmm):
             csv_object.writerow([file, argmax, round(max, 2)])
     csv_file.close()
 
-frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type, permutations = setup()
+frame_length, mel_filters, predictor_order, cepstral_coefficient, GMM_components, covariance_type = setup()
 Fs, mfcc_matrix, filename = compute_mfcc('train', mel_filters)
 mfcc_matrix_train, mfcc_matrix_test = split_data(mfcc_matrix, 5)
 mfcc_matrix_train_concatenated = concatenate_data(mfcc_matrix_train)

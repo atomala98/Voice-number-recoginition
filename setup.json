@@ -1,0 +1,8 @@
+{
+    "Frame length": 0.05,
+    "Mel filters amount": 26,
+    "Predictor order": 1,
+    "Cepstral coefficients amount": 23,
+    "GMM components amount": 8,
+    "Covariance matrix type": "diag"
+}
